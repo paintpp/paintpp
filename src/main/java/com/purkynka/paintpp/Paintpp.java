@@ -1,6 +1,7 @@
 package com.purkynka.paintpp;
 
 import atlantafx.base.theme.CupertinoDark;
+import com.purkynka.paintpp.menubar.MenuBar;
 import javafx.application.Application;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -16,70 +17,7 @@ public class Paintpp extends Application {
 
         var root = new VBox();
 
-        var mainMenuBar = new MenuBar();
-
-        var fileMenu = new Menu();
-        fileMenu.setText("File");
-
-        var newBlank = new MenuItem();
-        newBlank.setText("New blank image");
-        var loadFile = new MenuItem();
-        loadFile.setText("Load image");
-        var generateImage = new MenuItem();
-        generateImage.setText("Generate image");
-        var saveImage = new MenuItem();
-        saveImage.setText("Save image");
-        var saveAs = new MenuItem();
-        saveAs.setText("Save as image");
-
-        fileMenu.getItems().addAll(newBlank, loadFile, generateImage, saveImage, saveAs);
-
-        var filterMenu = new Menu();
-        filterMenu.setText("Filters");
-
-        var basicFilters = new Menu();
-        basicFilters.setText("Basic filters");
-
-        var sharpen = new CustomMenuItem();
-        var sharpenGrid = new VBox();
-        var sharpenLabel = new Label();
-        sharpenLabel.setText("Sharpen");
-        var sharpenSlider = new Slider();
-        sharpenSlider.setValue(50);
-        sharpenGrid.getChildren().addAll(sharpenLabel, sharpenSlider);
-        sharpen.setContent(sharpenGrid);
-
-        var saturation = new CustomMenuItem();
-        var saturationGrid = new VBox();
-        var saturationLabel = new Label();
-        saturationLabel.setText("Saturation");
-        var saturationSlider = new Slider();
-        saturationSlider.setValue(50);
-        saturationGrid.getChildren().addAll(saturationLabel, saturationSlider);
-        saturation.setContent(saturationGrid);
-
-        basicFilters.getItems().addAll(sharpen, saturation);
-
-        filterMenu.getItems().add(basicFilters);
-
-        var invertColor =  new MenuItem();
-        invertColor.setText("Invert color");
-        var blackAndWhite = new MenuItem();
-        blackAndWhite.setText("Black and White");
-        var resetFilters = new MenuItem();
-        resetFilters.setText("Reset filters");
-
-        filterMenu.getItems().addAll(invertColor, blackAndWhite, resetFilters);
-
-        var infoMenu = new Menu();
-        infoMenu.setText("Info");
-
-        var credits = new MenuItem();
-        credits.setText("Credits");
-
-        infoMenu.getItems().addAll(credits);
-
-        mainMenuBar.getMenus().addAll(fileMenu, filterMenu, infoMenu);
+        var menuBar = new MenuBar();
 
         var mainSplitPane = new SplitPane();
         VBox.setVgrow(mainSplitPane, Priority.ALWAYS);
@@ -100,7 +38,7 @@ public class Paintpp extends Application {
         matrixLabel.setAlignment(Pos.CENTER);
         
         brushesAndMatrix.getChildren().addAll(basicFiltersLabel, matrixLabel);
-        
+
         var pictureFrame = new VBox();
         
         var pictureLabel = new Label();
@@ -137,7 +75,7 @@ public class Paintpp extends Application {
         mainSplitPane.setDividerPositions(0.2, 0.8);
 
         mainSplitPane.getItems().addAll(brushesAndMatrix, pictureFrame, ColorAndLayers);
-        root.getChildren().addAll(mainMenuBar, mainSplitPane);
+        root.getChildren().addAll(menuBar, mainSplitPane);
         
         Scene scene = new Scene(root, 810, 540);
         stage.setTitle("Paint++");
