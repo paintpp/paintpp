@@ -1,5 +1,7 @@
 package com.purkynka.paintpp.mainview.leftsidepanel;
 
+import com.purkynka.paintpp.mainview.panes.ToolSettingsPane;
+import com.purkynka.paintpp.mainview.panes.ToolsPane;
 import javafx.geometry.Orientation;
 import javafx.scene.control.SplitPane;
 

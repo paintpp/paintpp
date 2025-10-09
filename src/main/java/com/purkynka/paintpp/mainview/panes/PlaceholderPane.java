@@ -1,4 +1,4 @@
-package com.purkynka.paintpp.mainview;
+package com.purkynka.paintpp.mainview.panes;
 
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;

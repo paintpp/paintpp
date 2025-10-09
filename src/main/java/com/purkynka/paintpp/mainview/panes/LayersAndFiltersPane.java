@@ -1,6 +1,4 @@
-package com.purkynka.paintpp.mainview.rightsidepanel;
-
-import com.purkynka.paintpp.mainview.PlaceholderPane;
+package com.purkynka.paintpp.mainview.panes;
 
 public class LayersAndFiltersPane extends PlaceholderPane {
     public LayersAndFiltersPane() {

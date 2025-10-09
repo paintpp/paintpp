@@ -1,6 +1,4 @@
-package com.purkynka.paintpp.mainview.leftsidepanel;
-
-import com.purkynka.paintpp.mainview.PlaceholderPane;
+package com.purkynka.paintpp.mainview.panes;
 
 public class ToolSettingsPane extends PlaceholderPane {
     public ToolSettingsPane() {

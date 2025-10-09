@@ -1,5 +1,7 @@
 package com.purkynka.paintpp.mainview.rightsidepanel;
 
+import com.purkynka.paintpp.mainview.panes.ColorPickerPane;
+import com.purkynka.paintpp.mainview.panes.LayersAndFiltersPane;
 import javafx.geometry.Orientation;
 import javafx.scene.control.SplitPane;
 
