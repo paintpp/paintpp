@@ -13,6 +13,10 @@ public class ImageProvider {
         FileMenu.LOAD_IMAGE_EVENT.addListener(this::onLoadImage);
     }
 
+    public Image getOriginalImage() {
+        return originalImage;
+    }
+
     private void onLoadImage(String imageURI) {
         originalImage = new Image(imageURI);
 
