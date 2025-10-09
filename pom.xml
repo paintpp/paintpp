@@ -11,18 +11,15 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
         <junit.version>5.12.1</junit.version>
+        -->
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>21.0.6</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-fxml</artifactId>
             <version>21.0.6</version>
         </dependency>
 
@@ -32,6 +29,7 @@
             <version>2.1.0</version>
         </dependency>
 
+        <!--
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
@@ -44,6 +42,7 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+        -->
     </dependencies>
 
     <build>

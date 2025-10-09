@@ -9,11 +9,9 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import java.io.IOException;
-
 public class Paintpp extends Application {
     @Override
-    public void start(Stage stage) throws IOException {
+    public void start(Stage stage) {
         Application.setUserAgentStylesheet(new CupertinoDark().getUserAgentStylesheet());
 
         var root = new VBox();
