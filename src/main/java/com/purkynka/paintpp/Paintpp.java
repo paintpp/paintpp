@@ -9,8 +9,12 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 public class Paintpp extends Application {
+    public static Stage PRIMARY_STAGE;
+
     @Override
     public void start(Stage stage) {
+        PRIMARY_STAGE = stage;
+
         Application.setUserAgentStylesheet(new CupertinoDark().getUserAgentStylesheet());
 
         var root = new VBox();
