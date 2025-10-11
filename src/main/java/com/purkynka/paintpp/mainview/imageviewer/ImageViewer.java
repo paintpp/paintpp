@@ -2,12 +2,15 @@ package com.purkynka.paintpp.mainview.imageviewer;
 
 import atlantafx.base.theme.Styles;
 import com.purkynka.paintpp.logic.imageprovider.ImageProvider;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.StackPane;
 import com.purkynka.paintpp.mainview.MainView;
@@ -26,7 +29,7 @@ public class ImageViewer extends StackPane {
      * Required for zooming to work properly, due to
      * {@link ScrollPane} nodes not understanding scale without a {@link Group}
      */
-    private Group imageGroup;
+    private StackPane imageStackPane;
 
     /**
      * {@link Canvas} holding the currently visible {@link Image}
@@ -40,11 +43,6 @@ public class ImageViewer extends StackPane {
     private ScrollPane imageScrollPane;
 
     /**
-     * Provides the original {@link Image} that was created or loaded
-     */
-    private ImageProvider imageProvider;
-
-    /**
      * If the {@link ImageViewer} doesn't contain an {@link Image}
      */
     private boolean empty = true;
@@ -52,7 +50,7 @@ public class ImageViewer extends StackPane {
     /**
      * Minimum amount of zoom
      */
-    private static final double MIN_ZOOM = 0.25d;
+    private static double minZoom;
 
     /**
      * Maximum amount of zoom
@@ -62,13 +60,17 @@ public class ImageViewer extends StackPane {
     /**
      * The increment to use when zooming
      */
-    private static final double ZOOM_INCREMENT = 0.25d;
+    private static final double ZOOM_INCREMENT = 0.05d;
 
     /**
      * Current zoom level, used for scaling the {@link #imageCanvas}
      */
     private double currentZoom = 1d;
 
+    private final double[] loadedImageSize = new double[2];
+    private final double[] imageScrollPaneSliders = new double[2];
+    private boolean isPanning = false;
+    
     public ImageViewer() {
         super();
 
@@ -78,7 +80,6 @@ public class ImageViewer extends StackPane {
 
         setupImageProvider();
 
-        setupResizeHandlers();
         setupZoomHandler();
 
         getChildren().addAll(
@@ -98,82 +99,111 @@ public class ImageViewer extends StackPane {
     }
 
     /**
-     * Creates the {@link #imageGroup} containing the {@link #imageCanvas}
+     * Creates the {@link #imageStackPane} containing the {@link #imageCanvas}
      */
     private void setupImageNodes() {
-        imageGroup = new Group();
+        imageStackPane = new StackPane();
+        imageStackPane.setPadding(new Insets(100));
+        imageStackPane.setAlignment(Pos.CENTER);
+
+        Group imageGroup = new Group();
+        imageStackPane.getChildren().add(imageGroup);
 
         imageCanvas = new Canvas();
         imageGroup.getChildren().add(imageCanvas);
     }
 
     /**
-     * Creates the {@link #imageScrollPane} that contains the {@link #imageGroup}
+     * Creates the {@link #imageScrollPane} that contains the {@link #imageStackPane}
      */
     private void setupImageScrollPane() {
-        imageScrollPane = new ScrollPane(imageGroup);
+        imageScrollPane = new ScrollPane();
         imageScrollPane.setPannable(true);
-        imageScrollPane.setContent(imageGroup);
+        imageScrollPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        imageScrollPane.setContent(imageStackPane);
+
+        imageScrollPane.addEventFilter(MouseEvent.MOUSE_DRAGGED, _ -> isPanning = true);
+        imageScrollPane.addEventFilter(MouseEvent.MOUSE_RELEASED, _ -> isPanning = false);
+        
+        imageScrollPane.vvalueProperty().addListener((_, _, newValue) -> {
+            if (isPanning) {
+                imageScrollPaneSliders[0] = newValue.doubleValue();
+            }
+        });
+        imageScrollPane.hvalueProperty().addListener((_, _, newValue) -> {
+            if (isPanning) {
+                imageScrollPaneSliders[1] = newValue.doubleValue();
+            }
+        });
     }
 
     /**
      * Sets up the {@link ImageProvider} and related event handlers
      */
     private void setupImageProvider() {
-        imageProvider = new ImageProvider();
+        ImageProvider _ = new ImageProvider();
         ImageProvider.NEW_IMAGE_EVENT.addListener(this::onNewImage);
     }
 
     /**
      * Runs when a new {@link Image} is provided by the user, either by creating
      * or loading it
+     *
      * @param image The new {@link Image} to show
      */
     private void onNewImage(Image image) {
-        var imageWidth = image.getWidth();
-        var imageHeight = image.getHeight();
+        loadedImageSize[0] = image.getWidth();
+        loadedImageSize[1] = image.getHeight();
 
         if (empty) getChildren().remove(missingImageLabel);
 
-        currentZoom = 1d;
-        imageCanvas.setWidth(imageWidth);
-        imageCanvas.setHeight(imageHeight);
+        calculateNewMinZoom();
+
+        imageCanvas.setWidth(loadedImageSize[0]);
+        imageCanvas.setHeight(loadedImageSize[1]);
+        imageCanvas.setScaleX(currentZoom);
+        imageCanvas.setScaleY(currentZoom);
 
         var canvasContext = imageCanvas.getGraphicsContext2D();
-        canvasContext.clearRect(0, 0, imageWidth, imageHeight);
+        canvasContext.clearRect(0, 0, loadedImageSize[0], loadedImageSize[1]);
         canvasContext.drawImage(image, 0, 0);
 
-        resizeInnerScrollPane();
+        if (empty) {
+            imageScrollPane.widthProperty().addListener((_, _, _) -> calculateNewMinZoom());
+            imageScrollPane.heightProperty().addListener((_, _, _) -> calculateNewMinZoom());
+        }
+
+        Platform.runLater(() -> {
+            setZoom(minZoom);
+            imageScrollPaneSliders[0] = 0.5;
+            imageScrollPaneSliders[1] = 0.5;
+            imageScrollPane.setVvalue(0.5);
+            imageScrollPane.setHvalue(0.5);
+        });
 
         empty = false;
     }
 
-    /**
-     * Resizes the {@link #imageScrollPane} to either the size of the currently shown {@link Image}
-     * or the available size provided by the parent {@link MainView}
-     */
-    private void resizeInnerScrollPane() {
-        var originalImage = imageProvider.getOriginalImage();
-        if (originalImage == null) return;
+    private void calculateNewMinZoom() {
+        var contextWidth = this.getWidth() - 200;
+        var contextHeight = this.getHeight() - 200;
 
-        var newWidth = Math.min(getWidth(), originalImage.getWidth() * currentZoom);
-        var newHeight = Math.min(getHeight(), originalImage.getHeight() * currentZoom);
+        var wantedZoomWidth = contextWidth / (loadedImageSize[0]);
+        var wantedZoomHeight = contextHeight / (loadedImageSize[1]);
 
-        imageScrollPane.setMaxSize(newWidth, newHeight);
-    }
+        var newMinZoom = Math.max(Math.min(wantedZoomWidth, wantedZoomHeight), 0.001);
 
-    /**
-     * Sets up listeners that run whenever the size provided by the parent {@link MainView} changes,
-     * that resize the {@link #imageScrollPane}
-     */
-    private void setupResizeHandlers() {
-        widthProperty().addListener(_ -> resizeInnerScrollPane());
-        heightProperty().addListener(_ -> resizeInnerScrollPane());
+        var newZoom = newMinZoom / (minZoom / currentZoom);
+        minZoom = newMinZoom;
+        currentZoom = newZoom;
+
+        setZoom(currentZoom);
     }
 
     /**
      * Calculates a new {@link #currentZoom} value and then scales the {@link #imageCanvas}
      * based on it
+     *
      * @param zoomDelta Scroll wheel delta from a {@link ScrollEvent}
      */
     private void onZoom(double zoomDelta) {
@@ -181,14 +211,28 @@ public class ImageViewer extends StackPane {
 
         var lastZoom = currentZoom;
         var zoomChange = zoomDelta > 0 ? ZOOM_INCREMENT : -ZOOM_INCREMENT;
-        currentZoom = Math.clamp(currentZoom + zoomChange, MIN_ZOOM, MAX_ZOOM);
+        var zoom = Math.clamp(currentZoom + zoomChange, minZoom, MAX_ZOOM);
 
-        if (lastZoom == currentZoom) return;
+        if (lastZoom == zoom) return;
+
+        setZoom(zoom);
+    }
+    
+    private void setZoom(double zoom) {
+        if (zoom <= minZoom) zoom = minZoom;
+        else if (zoom >= MAX_ZOOM) zoom = MAX_ZOOM;
+
+        var oldZoom = currentZoom;
+        currentZoom = zoom;
 
         imageCanvas.setScaleX(currentZoom);
         imageCanvas.setScaleY(currentZoom);
 
-        resizeInnerScrollPane();
+        Platform.runLater(() -> {
+            double scaleRatio = currentZoom / oldZoom;
+            imageScrollPane.setVvalue(Math.clamp(imageScrollPaneSliders[0] * scaleRatio, 0, 1));
+            imageScrollPane.setHvalue(Math.clamp(imageScrollPaneSliders[1] * scaleRatio, 0, 1));
+        });
     }
 
     /**
@@ -197,9 +241,8 @@ public class ImageViewer extends StackPane {
      * them to cancel moving the {@link #imageScrollPane} when zooming
      */
     private void setupZoomHandler() {
-        imageScrollPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+        imageStackPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
-
             onZoom(e.getDeltaY());
 
             e.consume();
