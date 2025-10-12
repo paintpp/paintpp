@@ -13,6 +13,7 @@ import javafx.scene.image.Image;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.StackPane;
+import javafx.stage.Stage;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -34,13 +35,16 @@ public class ImageViewer extends StackPane {
     private double currentZoom = 1d;
 
     private final double[] loadedImageSize = new double[2];
-
-    public ImageViewer() {
+    private final double[] imageScrollPaneSliders = new double[2];
+    
+    public ImageViewer(Stage stage) {
         super();
 
         setupNodes();
         setupImageProvider();
         setupZoom(ZoomOption.ZOOM_TO_MOUSE);
+
+        stage.fullScreenProperty().addListener((_, _, _) -> Platform.runLater(() -> setScrollPaneSliders(imageScrollPaneSliders[0], imageScrollPaneSliders[1])));
     }
     
     private void setupNodes() {
@@ -83,6 +87,10 @@ public class ImageViewer extends StackPane {
         imageScrollPane.setContent(imageCenterPane);
         
         imageCenterPane.setPrefSize(imageScrollPane.getWidth(), imageScrollPane.getHeight());
+        
+        // Add to set imageScrollPaneSliders only when the imageScrollPane size didn't change
+        imageScrollPane.vvalueProperty().addListener((_, _, newValue) -> imageScrollPaneSliders[0] = newValue.doubleValue());
+        imageScrollPane.hvalueProperty().addListener((_, _, newValue) -> imageScrollPaneSliders[1] = newValue.doubleValue());
     }
 
     private void setupImageProvider() {
@@ -130,6 +138,7 @@ public class ImageViewer extends StackPane {
 
         var newZoom = newMinZoom / (minZoom / currentZoom);
         minZoom = Math.min(newMinZoom, 1d);
+        var oldZoom = currentZoom;
         currentZoom = Math.min(newZoom, 1d);
 
         var wantedMaxZoomWidth = imageScrollPaneWidth / (loadedImageSize[0]) * 5;
@@ -138,6 +147,12 @@ public class ImageViewer extends StackPane {
         maxZoom = Math.max(wantedMaxZoomWidth, wantedMaxZoomHeight);
         
         setCanvasScaling(currentZoom, currentZoom);
+        
+        Platform.runLater(() -> {
+            double scaleRatio = currentZoom / oldZoom;
+            imageScrollPane.setVvalue(Math.clamp(imageScrollPaneSliders[0] * scaleRatio, 0, 1));
+            imageScrollPane.setHvalue(Math.clamp(imageScrollPaneSliders[1] * scaleRatio, 0, 1));
+        });
     }
 
     private void setCurrentZoomFromDelta(double zoomDelta) {
@@ -146,8 +161,7 @@ public class ImageViewer extends StackPane {
         var lastZoom = currentZoom;
         var zoomChange = zoomDelta > 0 ? zoomIncrement * currentZoom : -zoomIncrement * currentZoom;
         var zoom = Math.clamp(currentZoom + zoomChange, minZoom, maxZoom);
-
-        System.out.println("ImageStackPane width: " + imagePaddingPane.getWidth() + ", height: " + imagePaddingPane.getHeight());
+        
         if (lastZoom == zoom) return;
         currentZoom = zoom;
     }
@@ -237,7 +251,7 @@ public class ImageViewer extends StackPane {
             moved.set(true);
         });
 
-        imagePaddingPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+        imageScrollPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
             
             var oldZoom = currentZoom;

@@ -20,7 +20,7 @@ public class Paintpp extends Application {
         var root = new VBox();
 
         var menuBar = new MenuBar();
-        var mainView = new MainView();
+        var mainView = new MainView(stage);
 
         root.getChildren().addAll(menuBar, mainView);
         
