@@ -93,13 +93,13 @@ public class ImageViewer extends StackPane {
             imageScrollPane.heightProperty().addListener((_, _, _) -> calculateNewMinMaxZoom());
         }
         
-        calculateNewMinMaxZoom();
-        
         imageCanvas.setWidth(loadedImageSize[0]);
         imageCanvas.setHeight(loadedImageSize[1]);
-        System.out.println(currentZoom);
-        setCanvasScaling(currentZoom, currentZoom);
 
+        calculateNewMinMaxZoom();
+        
+        setCanvasScaling(minZoom, minZoom);
+        
         var canvasContext = imageCanvas.getGraphicsContext2D();
         canvasContext.clearRect(0, 0, loadedImageSize[0], loadedImageSize[1]);
         canvasContext.drawImage(image, 0, 0);
@@ -120,8 +120,8 @@ public class ImageViewer extends StackPane {
         var newMinZoom = Math.max(Math.min(wantedMinZoomWidth, wantedMinZoomHeight), 0.001);
 
         var newZoom = newMinZoom / (minZoom / currentZoom);
-        minZoom = newMinZoom;
-        currentZoom = newZoom;
+        minZoom = Math.min(newMinZoom, 1d);
+        currentZoom = Math.min(newZoom, 1d);
 
         var wantedMaxZoomWidth = imageScrollPaneWidth / (loadedImageSize[0]) * 5;
         var wantedMaxZoomHeight = imageScrollPaneHeight / (loadedImageSize[1]) * 5;
