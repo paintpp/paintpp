@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class ImageViewer extends StackPane {
-    private static final int BORDER_PADDING = 100;
+    private static final int BORDER_PADDING = 50;
     
     private Label missingImageLabel;
     private ScrollPane imageScrollPane;
@@ -98,7 +98,8 @@ public class ImageViewer extends StackPane {
 
         calculateNewMinMaxZoom();
         
-        setCanvasScaling(minZoom, minZoom);
+        currentZoom = minZoom;
+        setCanvasScaling(currentZoom, currentZoom);
         
         var canvasContext = imageCanvas.getGraphicsContext2D();
         canvasContext.clearRect(0, 0, loadedImageSize[0], loadedImageSize[1]);
@@ -138,6 +139,7 @@ public class ImageViewer extends StackPane {
         var zoomChange = zoomDelta > 0 ? zoomIncrement * currentZoom : -zoomIncrement * currentZoom;
         var zoom = Math.clamp(currentZoom + zoomChange, minZoom, maxZoom);
 
+        System.out.println("ImageStackPane width: " + imageStackPane.getWidth() + ", height: " + imageStackPane.getHeight());
         if (lastZoom == zoom) return;
         currentZoom = zoom;
     }
@@ -219,8 +221,6 @@ public class ImageViewer extends StackPane {
         imageCanvas.setOnMouseMoved((event) -> {
             lastMousePosition[0] = event.getX();
             lastMousePosition[1] = event.getY();
-
-            
             
             // Cool movement
             // setScrollPaneSliders(lastNormalizedPosition[1], lastNormalizedPosition[0]);
@@ -240,7 +240,7 @@ public class ImageViewer extends StackPane {
             
             setCanvasScaling(currentZoom, currentZoom);
             
-            if (!zoomingOut) {
+            if (zoomingOut) {
                 var imageCanvasWidth = imageCanvas.getWidth();
                 var imageCanvasHeight = imageCanvas.getHeight();
 
