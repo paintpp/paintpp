@@ -22,7 +22,8 @@ public class ImageViewer extends StackPane {
     
     private Label missingImageLabel;
     private ScrollPane imageScrollPane;
-    private StackPane imageStackPane;
+    private StackPane imageCenterPane;
+    private StackPane imagePaddingPane;
     private Canvas imageCanvas;
 
     private boolean empty = true;
@@ -60,12 +61,16 @@ public class ImageViewer extends StackPane {
     }
 
     private void setupImageNodes() {
-        imageStackPane = new StackPane();
-        imageStackPane.setPadding(new Insets(BORDER_PADDING));
-        imageStackPane.setAlignment(Pos.CENTER);
+        imageCenterPane = new StackPane();
+        imageCenterPane.setAlignment(Pos.CENTER);
+        
+        imagePaddingPane = new StackPane();
+        imagePaddingPane.setPadding(new Insets(BORDER_PADDING));
+        imagePaddingPane.setAlignment(Pos.CENTER);
+        imageCenterPane.getChildren().add(imagePaddingPane);
 
         Group imageGroup = new Group();
-        imageStackPane.getChildren().add(imageGroup);
+        imagePaddingPane.getChildren().add(imageGroup);
 
         imageCanvas = new Canvas();
         imageGroup.getChildren().add(imageCanvas);
@@ -75,7 +80,9 @@ public class ImageViewer extends StackPane {
         imageScrollPane = new ScrollPane();
         imageScrollPane.setPannable(true);
         imageScrollPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        imageScrollPane.setContent(imageStackPane);
+        imageScrollPane.setContent(imageCenterPane);
+        
+        imageCenterPane.setPrefSize(imageScrollPane.getWidth(), imageScrollPane.getHeight());
     }
 
     private void setupImageProvider() {
@@ -111,7 +118,8 @@ public class ImageViewer extends StackPane {
     private void calculateNewMinMaxZoom() {
         var imageScrollPaneWidth = imageScrollPane.getWidth();
         var imageScrollPaneHeight = imageScrollPane.getHeight();
-        
+        imageCenterPane.setPrefSize(imageScrollPaneWidth, imageScrollPaneHeight);
+
         var contextWidth = imageScrollPaneWidth - BORDER_PADDING * 2;
         var contextHeight = imageScrollPaneHeight - BORDER_PADDING * 2;
 
@@ -139,7 +147,7 @@ public class ImageViewer extends StackPane {
         var zoomChange = zoomDelta > 0 ? zoomIncrement * currentZoom : -zoomIncrement * currentZoom;
         var zoom = Math.clamp(currentZoom + zoomChange, minZoom, maxZoom);
 
-        System.out.println("ImageStackPane width: " + imageStackPane.getWidth() + ", height: " + imageStackPane.getHeight());
+        System.out.println("ImageStackPane width: " + imagePaddingPane.getWidth() + ", height: " + imagePaddingPane.getHeight());
         if (lastZoom == zoom) return;
         currentZoom = zoom;
     }
@@ -147,6 +155,8 @@ public class ImageViewer extends StackPane {
     private void setScrollPaneSliders(double vValue, double hValue) {
         vValue = Math.clamp(vValue, 0, 1);
         hValue = Math.clamp(hValue, 0, 1);
+
+        imageCenterPane.setPrefSize(imageScrollPane.getWidth(), imageScrollPane.getHeight());
 
         imageScrollPane.setVvalue(vValue);
         imageScrollPane.setHvalue(hValue);
@@ -169,7 +179,7 @@ public class ImageViewer extends StackPane {
     }
 
     private void setupCenterZoom() {
-        imageStackPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+        imagePaddingPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
 
             setCurrentZoomFromDelta(e.getDeltaY());
@@ -196,7 +206,7 @@ public class ImageViewer extends StackPane {
             if (isPanning.get()) lastNormalizedPosition[1] = newValue.doubleValue();
         });
 
-        imageStackPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+        imagePaddingPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
 
             var oldZoom = currentZoom;
@@ -227,7 +237,7 @@ public class ImageViewer extends StackPane {
             moved.set(true);
         });
 
-        imageStackPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+        imagePaddingPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
             
             var oldZoom = currentZoom;
