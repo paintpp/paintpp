@@ -10,17 +10,14 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 
 public class ImageViewer extends StackPane {
-    private static final int BORDER_PADDING = 100;
-
+    private static final ZoomOption zoomOption = ZoomOption.ZOOM_TOWARDS_MOUSE_POSITION;
+    
     private Label missingImageLabel;
     private ScrollPane imageScrollPane;
     private StackPane imageCenterPane;
@@ -31,7 +28,6 @@ public class ImageViewer extends StackPane {
 
     private static double minZoom = 0.2d;
     private static double maxZoom = 5d;
-    private static double zoomIncrement = 0.05d;
     private double currentZoom = 1d;
 
     private final double[] loadedImageSize = new double[2];
@@ -42,7 +38,7 @@ public class ImageViewer extends StackPane {
 
         setupNodes();
         setupImageProvider();
-        setupZoom(ZoomOption.ZOOM_TO_MOUSE);
+        setupZoom(zoomOption);
 
         stage.fullScreenProperty().addListener((_, _, _) -> Platform.runLater(() -> setScrollPaneSliders(imageScrollPaneSliders[0], imageScrollPaneSliders[1])));
     }
@@ -69,7 +65,6 @@ public class ImageViewer extends StackPane {
         imageCenterPane.setAlignment(Pos.CENTER);
 
         imagePaddingPane = new StackPane();
-        imagePaddingPane.setPadding(new Insets(BORDER_PADDING));
         imagePaddingPane.setAlignment(Pos.CENTER);
         imageCenterPane.getChildren().add(imagePaddingPane);
 
@@ -88,7 +83,6 @@ public class ImageViewer extends StackPane {
 
         imageCenterPane.setPrefSize(imageScrollPane.getWidth(), imageScrollPane.getHeight());
 
-        // Add to set imageScrollPaneSliders only when the imageScrollPane size didn't change
         imageScrollPane.vvalueProperty().addListener((_, _, newValue) -> imageScrollPaneSliders[0] = newValue.doubleValue());
         imageScrollPane.hvalueProperty().addListener((_, _, newValue) -> imageScrollPaneSliders[1] = newValue.doubleValue());
     }
@@ -115,11 +109,12 @@ public class ImageViewer extends StackPane {
 
         currentZoom = minZoom;
         setZoom(currentZoom);
-
+        
         var canvasContext = imageCanvas.getGraphicsContext2D();
         canvasContext.clearRect(0, 0, loadedImageSize[0], loadedImageSize[1]);
         canvasContext.drawImage(image, 0, 0);
 
+        Platform.runLater(() -> Platform.runLater(() -> setScrollPaneSliders(0.5, 0.5)));
         empty = false;
     }
 
@@ -128,8 +123,8 @@ public class ImageViewer extends StackPane {
         var imageScrollPaneHeight = imageScrollPane.getHeight();
         imageCenterPane.setPrefSize(imageScrollPaneWidth, imageScrollPaneHeight);
 
-        var contextWidth = imageScrollPaneWidth - BORDER_PADDING * 2;
-        var contextHeight = imageScrollPaneHeight - BORDER_PADDING * 2;
+        var contextWidth = imageScrollPaneWidth - Math.min(loadedImageSize[0] / 10, 100);
+        var contextHeight = imageScrollPaneHeight - Math.min(loadedImageSize[1] / 10, 100);
 
         var wantedMinZoomWidth = contextWidth / (loadedImageSize[0]);
         var wantedMinZoomHeight = contextHeight / (loadedImageSize[1]);
@@ -147,18 +142,19 @@ public class ImageViewer extends StackPane {
         maxZoom = Math.max(wantedMaxZoomWidth, wantedMaxZoomHeight);
 
         setZoom(currentZoom);
-
-        Platform.runLater(() -> {
-            double scaleRatio = currentZoom / oldZoom;
-            imageScrollPane.setVvalue(Math.clamp(imageScrollPaneSliders[0] * scaleRatio, 0, 1));
-            imageScrollPane.setHvalue(Math.clamp(imageScrollPaneSliders[1] * scaleRatio, 0, 1));
-        });
+        
+        double scaleRatio = currentZoom / oldZoom;
+        setScrollPaneSliders(
+                imageScrollPane.getVvalue() * scaleRatio,
+                imageScrollPane.getHvalue() * scaleRatio
+        );
     }
 
     private void setCurrentZoomFromDelta(double zoomDelta) {
         if (zoomDelta == 0) return;
 
         var lastZoom = currentZoom;
+        double zoomIncrement = 0.05d;
         var zoomChange = zoomDelta > 0 ? zoomIncrement * currentZoom : -zoomIncrement * currentZoom;
         var zoom = Math.clamp(currentZoom + zoomChange, minZoom, maxZoom);
 
@@ -181,92 +177,154 @@ public class ImageViewer extends StackPane {
 
         imageCanvas.setScaleX(zoom);
         imageCanvas.setScaleY(zoom);
+        
+        var topBottom = imageScrollPane.getHeight() / 2;
+        var leftRight = imageScrollPane.getWidth() / 2;
+        imagePaddingPane.setPadding(new Insets(topBottom, leftRight, topBottom, leftRight));
     }
 
     private void setupZoom(ZoomOption zoomOption) {
         switch (zoomOption) {
-            case ZOOM_CENTER -> setupCenterZoom();
-            case ZOOM_LAST_POSITION -> setupLastPositionZoom();
-            case ZOOM_TO_MOUSE -> setupToMouseZoom();
+            case ZOOM_IMAGE_CENTER -> setupZoomImageCenter();
+            case ZOOM_POSITION_CENTER -> setupZoomPositionCenter();
+            case ZOOM_LAST_MOUSE_POSITION -> setupZoomLastMousePosition();
+            case ZOOM_TOWARDS_MOUSE_POSITION -> setupZoomTowardsMousePosition();
         }
     }
-
-    private void setupCenterZoom() {
-        imagePaddingPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+    
+    private void setupZoomImageCenter() {
+        imageScrollPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
 
+            var oldZoom = currentZoom;
             setCurrentZoomFromDelta(e.getDeltaY());
+
+            if (currentZoom == oldZoom) {
+                e.consume();
+                return;
+            }
+            
             setZoom(currentZoom);
 
-            Platform.runLater(() -> setScrollPaneSliders(0.5, 0.5));
+            setScrollPaneSliders(0.5, 0.5);
 
             e.consume();
         });
     }
 
-    private void setupLastPositionZoom() {
-        AtomicBoolean isPanning = new AtomicBoolean(false);
-        final double[] lastNormalizedPosition = new double[2];
-
-        imageScrollPane.addEventFilter(MouseEvent.MOUSE_DRAGGED, _ -> isPanning.set(true));
-        imageScrollPane.addEventFilter(MouseEvent.MOUSE_RELEASED, _ -> isPanning.set(false));
-
-        imageScrollPane.vvalueProperty().addListener((_, _, newValue) -> {
-            if (isPanning.get()) lastNormalizedPosition[0] = newValue.doubleValue();
-        });
-
-        imageScrollPane.hvalueProperty().addListener((_, _, newValue) -> {
-            if (isPanning.get()) lastNormalizedPosition[1] = newValue.doubleValue();
-        });
-
-        imagePaddingPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+    private void setupZoomPositionCenter() {
+        imageScrollPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
-
+            
             var oldZoom = currentZoom;
             setCurrentZoomFromDelta(e.getDeltaY());
+            
+            if (currentZoom == oldZoom) {
+                e.consume();
+                return;
+            }
+            
             setZoom(currentZoom);
 
             double scaleRatio = currentZoom / oldZoom;
-            Platform.runLater(() -> setScrollPaneSliders(
-                    lastNormalizedPosition[0] * scaleRatio,
-                    lastNormalizedPosition[1] * scaleRatio
-            ));
-
+            imageScrollPane.setHvalue(imageScrollPane.getHvalue() * scaleRatio);
+            imageScrollPane.setVvalue(imageScrollPane.getVvalue() * scaleRatio);
+            
             e.consume();
         });
     }
 
-    private void setupToMouseZoom() {
-        imageCenterPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+    private void setupZoomLastMousePosition() {
+        final double[] lastMousePosition = new double[2];
+
+        imageCanvas.setOnMouseMoved((event) -> {
+            lastMousePosition[0] = event.getX();
+            lastMousePosition[1] = event.getY();
+        });
+
+        imageScrollPane.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (empty || !e.isControlDown()) return;
 
             var oldZoom = currentZoom;
             setCurrentZoomFromDelta(e.getDeltaY());
-            
-            if(currentZoom == oldZoom) {
+
+            if (currentZoom == oldZoom) {
                 e.consume();
                 return;
             }
 
-            var oldVValue = imageScrollPane.getVvalue();
-            var oldHValue = imageScrollPane.getHvalue();
-            
             setZoom(currentZoom);
             
-            if (currentZoom < oldZoom) {
-                var scaleRatio = currentZoom / oldZoom;
-                Platform.runLater(() -> setScrollPaneSliders(oldVValue * scaleRatio, oldHValue * scaleRatio));
+            var hValue = imageScrollPane.getHvalue();
+            var vValue = imageScrollPane.getVvalue();
+
+            var zoomingIn = oldZoom < currentZoom;
+            if (zoomingIn) {
+                var imageCanvasWidth = imageCanvas.getWidth();
+                var imageCanvasHeight = imageCanvas.getHeight();
+
+                hValue = lastMousePosition[0] / imageCanvasWidth;
+                vValue = lastMousePosition[1] / imageCanvasHeight;
+            }
+            
+            double scaleRatio = currentZoom / oldZoom;
+            setScrollPaneSliders(
+                    vValue * scaleRatio,
+                    hValue * scaleRatio
+            );
+        });
+    }
+
+    private void setupZoomTowardsMousePosition() {
+        imageScrollPane.addEventFilter(ScrollEvent.SCROLL, e -> {
+            if (empty || !e.isControlDown()) return;
+
+            var oldZoom = currentZoom;
+            setCurrentZoomFromDelta(e.getDeltaY());
+
+            if (currentZoom == oldZoom) {
                 e.consume();
                 return;
             }
-            
-            Platform.runLater(() -> {
-                double newHValue = e.getX() / imageCenterPane.getWidth();
-                double newVValue = e.getY() / imageCenterPane.getHeight();
-                        
-                setScrollPaneSliders(newVValue, newHValue);
-            });
 
+            setZoom(currentZoom);
+            
+            double range = Math.min(0.1, 0.1 / (currentZoom * 2));
+            double offsetX, offsetY;
+            
+            var zoomingIn = oldZoom < currentZoom;
+            if (zoomingIn) {
+                offsetX = 1 + ((e.getX() / imageScrollPane.getWidth()) - 0.5) * (range * 2);
+                offsetY = 1 + ((e.getY() / imageScrollPane.getHeight()) - 0.5) * (range * 2);
+            } else {
+                offsetX = 1 - ((e.getX() / imageScrollPane.getWidth()) - 0.5) * (range * 2);
+                offsetY = 1 - ((e.getY() / imageScrollPane.getHeight()) - 0.5) * (range * 2);
+            }
+            
+            double scaleRatio = currentZoom / oldZoom;
+            
+            if (zoomingIn) {
+                setScrollPaneSliders(
+                        imageScrollPane.getVvalue() * scaleRatio * offsetY, 
+                        imageScrollPane.getHvalue() * scaleRatio * offsetX
+                );
+            } else {
+                imageScrollPane.setHvalue(imageScrollPane.getHvalue() * scaleRatio);
+                imageScrollPane.setVvalue(imageScrollPane.getVvalue() * scaleRatio);
+                
+                /* Centering experiment
+                double hValue = imageScrollPane.getHvalue();
+                double vValue = imageScrollPane.getVvalue();
+                double zoomProgress = (currentZoom - maxZoom) / (minZoom - maxZoom);
+                
+                hValue += (0.5 - hValue) * Math.sqrt(zoomProgress) * 0.5;
+                vValue += (0.5 - vValue) * Math.sqrt(zoomProgress) * 0.5;
+
+                imageScrollPane.setHvalue(hValue);
+                imageScrollPane.setVvalue(vValue);
+                */
+            }
+            
             e.consume();
         });
     }
